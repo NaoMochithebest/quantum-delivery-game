@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>量子あめ配達員 (Powered by Tytan)</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>量子あめ配達員 🍬</h1>
+        <p class="subtitle">家を順番にタップして最短ルートを作ろう。<br>バックエンドでTytan互換エンジン（量子アニーリングシミュレータ）が稼働中。</p>
+
+        <div class="game-info">
+            <div id="status">あなたの番です：家を順番にクリックしてください</div>
+            <div class="scores">
+                <p>あなた: <span id="player-score">---</span></p>
+                <p>量子AI: <span id="ai-score">---</span></p>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas" width="600" height="600"></canvas>
+
+        <div class="controls">
+            <button id="undoBtn" onclick="undoLast()" disabled>↩ 1つ戻す</button>
+            <button id="resetBtn" onclick="initGame()">🏘 新しい街へ</button>
+            <button id="competeBtn" onclick="callQuantumAI()" disabled>⚡ 量子AIと対決！</button>
+        </div>
+
+        <div class="legend">
+            <span class="legend-player">━ あなたのルート</span>
+            <span class="legend-ai">┅ 量子AIのルート</span>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
