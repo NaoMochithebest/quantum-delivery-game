@@ -1,7 +1,7 @@
 from http.server import BaseHTTPRequestHandler
 import json
 import numpy as np
-from ..tytan_lite import symbols_list, Compile, sampler, Auto_array
+from .tytan_lite import symbols_list, Compile, sampler, Auto_array
 
 
 class handler(BaseHTTPRequestHandler):
@@ -46,15 +46,18 @@ class handler(BaseHTTPRequestHandler):
             for i in range(N):
                 H += (sum(q[t][i] for t in range(N)) - 1) ** 2
 
-            # 4. コスト項: パス問題（最初の街に帰らない）
-            #    t→t+1 の辺のみ (N-1本)。% N のラップなし。
+            # 4. コスト項: 巡回問題（最後の街→最初の街に帰る）
+            #    t=0→1, 1→2, ..., N-2→N-1, N-1→0 の N本の辺
             Hcost = 0
-            for t in range(N - 1):
+            for t in range(N):
+                next_t = (t + 1) % N    # ← 最後のステップは最初に戻る
                 for i in range(N):
                     for j in range(N):
                         if i != j:
-                            Hcost += nd[i][j] * q[t][i] * q[t + 1][j]
+                            Hcost += nd[i][j] * q[t][i] * q[next_t][j]
 
+            # 重み: 制約の重み1.0に対し、コスト項は0.5
+            # 正規化済みなのでこのバランスで制約を優先しつつコストも反映
             qubo, offset = Compile(H + 0.5 * Hcost).get_qubo()
 
             # 5. サンプリング
