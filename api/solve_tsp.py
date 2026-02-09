@@ -1,106 +1,89 @@
 from http.server import BaseHTTPRequestHandler
 import json
 import numpy as np
-
-# tytan_lite: TYTANと同じAPIを提供する軽量版（pandas/networkx不要）
 from .tytan_lite import symbols_list, Compile, sampler, Auto_array
 
 
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
-        self._send_cors_headers()
+        self._cors()
         self.end_headers()
 
     def do_POST(self):
         try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            body = json.loads(self.rfile.read(content_length))
+            body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))))
             houses = body.get('houses', [])
+            shots = body.get('shots', 100)
+            T_num = body.get('T_num', None)
 
             N = len(houses)
             if N < 3:
-                self._send_json(400, {'error': '3軒以上の家が必要です'})
-                return
+                return self._json(400, {'error': '3軒以上必要'})
 
-            # 1. 距離行列の計算
-            dist_matrix = np.zeros((N, N))
+            # 1. 距離行列
+            dist = np.zeros((N, N))
             for i in range(N):
                 for j in range(N):
                     if i != j:
                         dx = houses[i]['x'] - houses[j]['x']
                         dy = houses[i]['y'] - houses[j]['y']
-                        dist_matrix[i][j] = np.sqrt(dx * dx + dy * dy)
+                        dist[i][j] = np.sqrt(dx * dx + dy * dy)
 
             # 正規化
-            max_dist = np.max(dist_matrix)
-            if max_dist > 0:
-                norm_dist = dist_matrix / max_dist
-            else:
-                norm_dist = dist_matrix
+            mx = np.max(dist)
+            nd = dist / mx if mx > 0 else dist
 
-            # 2. 量子ビットの用意 (TYTAN互換API)
+            # 2. 量子ビット: q[t][i] = ステップtで都市iを訪問
             q = symbols_list([N, N], 'q{}_{}')
 
-            # 3. QUBO定式化
+            # 3. 制約項
             H = 0
-
             # 制約A: 各ステップで訪れる都市は1つだけ
             for t in range(N):
-                row_sum = sum(q[t][i] for i in range(N))
-                H += (row_sum - 1) ** 2
-
+                H += (sum(q[t][i] for i in range(N)) - 1) ** 2
             # 制約B: 各都市は必ず1回だけ訪れる
             for i in range(N):
-                col_sum = sum(q[t][i] for t in range(N))
-                H += (col_sum - 1) ** 2
+                H += (sum(q[t][i] for t in range(N)) - 1) ** 2
 
-            # コスト項
+            # 4. コスト項: パス問題（最初の街に帰らない）
+            #    t→t+1 の辺のみ (N-1本)。% N のラップなし。
             Hcost = 0
-            for t in range(N):
-                next_t = (t + 1) % N
+            for t in range(N - 1):
                 for i in range(N):
                     for j in range(N):
                         if i != j:
-                            d = norm_dist[i][j]
-                            Hcost += d * q[t][i] * q[next_t][j]
+                            Hcost += nd[i][j] * q[t][i] * q[t + 1][j]
 
-            H_total = H + 0.5 * Hcost
+            qubo, offset = Compile(H + 0.5 * Hcost).get_qubo()
 
-            # 4. コンパイル (TYTAN互換API)
-            qubo, offset = Compile(H_total).get_qubo()
-
-            # 5. サンプリング (TYTAN互換 SASampler)
+            # 5. サンプリング
             solver = sampler.SASampler()
-            result = solver.run(qubo, shots=100)
+            result = solver.run(qubo, shots=shots, T_num=T_num)
 
-            # 6. 結果の解析 (TYTAN互換 Auto_array)
-            best_result = result[0]
-            arr, subs = Auto_array(best_result[0]).get_ndarray('q{}_{}')
-
-            ai_path = []
+            # 6. 結果デコード
+            arr, _ = Auto_array(result[0][0]).get_ndarray('q{}_{}')
+            path = []
             for t in range(N):
                 for i in range(N):
                     if arr[t][i] == 1:
-                        ai_path.append(i)
+                        path.append(i)
                         break
+            if len(path) != N or len(set(path)) != N:
+                path = list(range(N))
 
-            if len(ai_path) != N or len(set(ai_path)) != N:
-                ai_path = list(range(N))
-
-            self._send_json(200, {'path': ai_path})
-
+            self._json(200, {'path': path})
         except Exception as e:
-            self._send_json(500, {'error': str(e)})
+            self._json(500, {'error': str(e)})
 
-    def _send_cors_headers(self):
+    def _cors(self):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
 
-    def _send_json(self, status_code, data):
-        self.send_response(status_code)
+    def _json(self, code, data):
+        self.send_response(code)
         self.send_header('Content-Type', 'application/json')
-        self._send_cors_headers()
+        self._cors()
         self.end_headers()
-        self.wfile.write(json.dumps(data).encode('utf-8'))
+        self.wfile.write(json.dumps(data).encode())
