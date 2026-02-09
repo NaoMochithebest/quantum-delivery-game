@@ -1,7 +1,7 @@
 from http.server import BaseHTTPRequestHandler
 import json
 import numpy as np
-from .tytan_lite import symbols_list, Compile, sampler, Auto_array
+from ..tytan_lite import symbols_list, Compile, sampler, Auto_array
 
 
 class handler(BaseHTTPRequestHandler):
