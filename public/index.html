@@ -208,7 +208,7 @@ canvas {
 <div class="bg-particles"></div>
 <div class="app">
   <div class="title"><span class="title-emoji">⚛️</span> QUANTUM CANDY <span class="title-emoji">🍬</span></div>
-  <p class="subtitle">あめ配達員になって最短ルートを作ろう！（出発したら帰らない一筆書き）<br>量子AIに勝てるかな？</p>
+  <p class="subtitle">あめ配達員になって全部の家を回り、最短ルートで帰ってこよう！🏠<br>量子AIに勝てるかな？</p>
 
   <div class="level-bar" id="levelBar"></div>
 
@@ -239,6 +239,7 @@ canvas {
 
   <div class="legend">
     <span class="leg-you">━━ あなた</span>
+    <span style="color:#ff9800">┅┅ 帰り🏠</span>
     <span class="leg-ai">┅┅ 量子AI</span>
   </div>
 </div>
@@ -338,25 +339,47 @@ function draw() {
 
   // Player path
   if (playerPath.length > 1) {
+    // 往路（実線・黄色）
     ctx.strokeStyle = 'rgba(255, 221, 0, 0.8)';
     ctx.lineWidth = 3; ctx.setLineDash([]); ctx.shadowColor = '#ffdd00'; ctx.shadowBlur = 8;
     ctx.beginPath();
     ctx.moveTo(houses[playerPath[0]].x, houses[playerPath[0]].y);
     for (let i = 1; i < playerPath.length; i++) ctx.lineTo(houses[playerPath[i]].x, houses[playerPath[i]].y);
-    // パス問題: ループを閉じない
     ctx.stroke();
     ctx.shadowBlur = 0;
+    // 帰り（点線・オレンジ）: 全部選んだら最初の街に戻る線を描く
+    if (playerPath.length === N) {
+      const last = houses[playerPath[N-1]], first = houses[playerPath[0]];
+      ctx.strokeStyle = '#ff9800'; ctx.lineWidth = 2.5; ctx.setLineDash([8,6]);
+      ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(first.x, first.y); ctx.stroke();
+      ctx.setLineDash([]);
+      // 帰り矢印
+      const angle = Math.atan2(first.y - last.y, first.x - last.x);
+      const mx = (last.x + first.x) / 2, my = (last.y + first.y) / 2;
+      ctx.fillStyle = '#ff9800'; ctx.beginPath();
+      ctx.moveTo(mx + 10*Math.cos(angle), my + 10*Math.sin(angle));
+      ctx.lineTo(mx - 6*Math.cos(angle-0.5), my - 6*Math.sin(angle-0.5));
+      ctx.lineTo(mx - 6*Math.cos(angle+0.5), my - 6*Math.sin(angle+0.5));
+      ctx.closePath(); ctx.fill();
+      // 🏠ラベル
+      ctx.fillStyle = '#ff9800'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('🏠帰り', mx, my - 12);
+    }
   }
 
   // AI path
   if (aiPath) {
+    // AI往路（点線・水色）
     ctx.strokeStyle = 'rgba(0, 240, 255, 0.7)';
     ctx.lineWidth = 2.5; ctx.setLineDash([8,5]); ctx.shadowColor = '#00f0ff'; ctx.shadowBlur = 10;
     ctx.beginPath();
     ctx.moveTo(houses[aiPath[0]].x, houses[aiPath[0]].y);
     for (let i = 1; i < aiPath.length; i++) ctx.lineTo(houses[aiPath[i]].x, houses[aiPath[i]].y);
-    // パス問題: ループを閉じない
     ctx.stroke();
+    // AI帰り（細い点線・水色薄め）
+    const aiLast = houses[aiPath[aiPath.length-1]], aiFirst = houses[aiPath[0]];
+    ctx.strokeStyle = 'rgba(0,212,255,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(aiLast.x, aiLast.y); ctx.lineTo(aiFirst.x, aiFirst.y); ctx.stroke();
     ctx.setLineDash([]); ctx.shadowBlur = 0;
   }
 
@@ -405,9 +428,10 @@ function draw() {
 // DISTANCE
 // =============================================
 function tourDist(path) {
-  // パス問題: 最初の街に帰らない → N-1本の辺のみ
+  // 巡回問題: 全ての街を回って最初の街に帰る
   let d = 0;
   for (let i = 0; i < path.length-1; i++) d += Math.hypot(houses[path[i]].x-houses[path[i+1]].x, houses[path[i]].y-houses[path[i+1]].y);
+  d += Math.hypot(houses[path[path.length-1]].x-houses[path[0]].x, houses[path[path.length-1]].y-houses[path[0]].y);
   return Math.floor(d);
 }
 
@@ -447,7 +471,7 @@ function undo() {
 function finishPlayer() {
   const d = tourDist(playerPath);
   pScoreEl.textContent = d;
-  statusEl.textContent = `ルート完成！距離 ${d} — 量子AIと勝負しよう！（全${N}軒を回る最短パス）`;
+  statusEl.textContent = `🏠 帰還完了！ 総距離: ${d} — 量子AIと勝負しよう！`;
   fightBtn.disabled = false; undoBtn.disabled = true;
 }
 
