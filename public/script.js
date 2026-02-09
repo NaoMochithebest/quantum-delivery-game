@@ -30,18 +30,40 @@ function draw() {
     for(let x=0;x<canvas.width;x+=50){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
     for(let y=0;y<canvas.height;y+=50){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
     if(playerPath.length>1){
+        // 往路（実線・黄色）
         ctx.strokeStyle='#ffeb3b';ctx.lineWidth=3;ctx.setLineDash([]);ctx.beginPath();
         ctx.moveTo(houses[playerPath[0]].x,houses[playerPath[0]].y);
         for(let i=1;i<playerPath.length;i++) ctx.lineTo(houses[playerPath[i]].x,houses[playerPath[i]].y);
-        if(playerPath.length===HOUSE_COUNT) ctx.lineTo(houses[playerPath[0]].x,houses[playerPath[0]].y);
         ctx.stroke();
+        // 帰り（点線・オレンジ）
+        if(playerPath.length===HOUSE_COUNT){
+            const last=houses[playerPath[playerPath.length-1]], first=houses[playerPath[0]];
+            ctx.strokeStyle='#ff9800';ctx.lineWidth=2.5;ctx.setLineDash([8,6]);ctx.beginPath();
+            ctx.moveTo(last.x,last.y);ctx.lineTo(first.x,first.y);ctx.stroke();ctx.setLineDash([]);
+            // 帰り矢印
+            const angle=Math.atan2(first.y-last.y,first.x-last.x);
+            const mx=(last.x+first.x)/2, my=(last.y+first.y)/2;
+            ctx.fillStyle='#ff9800';ctx.beginPath();
+            ctx.moveTo(mx+10*Math.cos(angle),my+10*Math.sin(angle));
+            ctx.lineTo(mx-6*Math.cos(angle-0.5),my-6*Math.sin(angle-0.5));
+            ctx.lineTo(mx-6*Math.cos(angle+0.5),my-6*Math.sin(angle+0.5));
+            ctx.closePath();ctx.fill();
+            // 🏠ラベル
+            ctx.fillStyle='#ff9800';ctx.font='12px sans-serif';ctx.textAlign='center';
+            ctx.fillText('🏠帰り',mx,my-12);
+        }
     }
     if(aiPathData){
+        // AI往路（点線・水色）
         ctx.strokeStyle='#00d4ff';ctx.lineWidth=2.5;ctx.setLineDash([10,5]);ctx.beginPath();
         ctx.moveTo(houses[aiPathData[0]].x,houses[aiPathData[0]].y);
         for(let i=1;i<aiPathData.length;i++) ctx.lineTo(houses[aiPathData[i]].x,houses[aiPathData[i]].y);
-        ctx.lineTo(houses[aiPathData[0]].x,houses[aiPathData[0]].y);
-        ctx.stroke();ctx.setLineDash([]);
+        ctx.stroke();
+        // AI帰り（細い点線・水色薄め）
+        const aiLast=houses[aiPathData[aiPathData.length-1]], aiFirst=houses[aiPathData[0]];
+        ctx.strokeStyle='rgba(0,212,255,0.5)';ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.beginPath();
+        ctx.moveTo(aiLast.x,aiLast.y);ctx.lineTo(aiFirst.x,aiFirst.y);ctx.stroke();
+        ctx.setLineDash([]);
     }
     houses.forEach((house,idx)=>{
         const vi=playerPath.indexOf(idx);
@@ -69,7 +91,13 @@ function getPos(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.
 function selectHouseAt(pos){
     let bi=-1,bd=35;
     houses.forEach((h,i)=>{if(playerPath.includes(i))return;const d=Math.hypot(h.x-pos.x,h.y-pos.y);if(d<bd){bd=d;bi=i;}});
-    if(bi>=0){playerPath.push(bi);undoBtn.disabled=false;draw();const rem=HOUSE_COUNT-playerPath.length;if(rem>0)statusDiv.textContent=`あと${rem}軒！`;else finishPlayerTurn();}
+    if(bi>=0){
+        playerPath.push(bi);undoBtn.disabled=false;draw();
+        const rem=HOUSE_COUNT-playerPath.length;
+        if(rem>1) statusDiv.textContent=`あと${rem}軒！`;
+        else if(rem===1) statusDiv.textContent=`あと1軒！ 選んだら最初の家に帰るよ 🏠`;
+        else finishPlayerTurn();
+    }
 }
 
 function undoLast(){
@@ -80,7 +108,7 @@ function undoLast(){
 
 function finishPlayerTurn(){
     const d=calcTourDist(playerPath);playerScoreSpan.textContent=d;
-    statusDiv.textContent=`完了！ 距離: ${d} — 量子AIと対決ボタンを押そう`;competeBtn.disabled=false;undoBtn.disabled=true;
+    statusDiv.textContent=`🏠 帰還完了！ 総距離: ${d} — 量子AIと対決ボタンを押そう`;competeBtn.disabled=false;undoBtn.disabled=true;
 }
 
 async function callQuantumAI(){
